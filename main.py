@@ -1,7 +1,5 @@
 import sys
 import json
-from datetime import datetime
-
 import psycopg2
 from flask import Flask, request, jsonify, make_response
 from dijkstar import Graph, find_path
@@ -15,7 +13,7 @@ def planets():
 
     if request.method == "GET":
 
-        list_of_planets = database_execute_fetchall("SELECT * FROM planet", None)
+        list_of_planets = database_execute("SELECT * FROM planet", None, fetchOne=False)
 
         if list_of_planets is None:
             response = make_response(jsonify(list()), 200)
@@ -45,7 +43,7 @@ def planets():
 
         # into db
 
-        planet = database_execute_fetchone("insert into planet(id, name) values(default, %s) returning (id, name)", [planet_name])
+        planet = database_execute("insert into planet(id, name) values(default, %s) returning (id, name)", [planet_name], fetchOne=True)
 
         tmp_dict = dict()
         tmp_dict["id"] = int(planet[0])
@@ -64,7 +62,7 @@ def connections():
 
     if request.method == "GET":
 
-        list_of_connections = database_execute_fetchall("SELECT id, price, from_planet_id, to_planet_id FROM connection", None)
+        list_of_connections = database_execute("SELECT id, price, from_planet_id, to_planet_id FROM connection", None, fetchOne=False)
 
         if list_of_connections is None:
             response = make_response(jsonify(list()), 200)
@@ -95,15 +93,15 @@ def connections():
             return make_response(jsonify("Error"), 422)
 
         # check if from and to are valid
-        to_planet = database_execute_fetchone("SELECT id from planet where id = %d", [to_planet_id])
+        to_planet = database_execute("SELECT id from planet where id = %d", [to_planet_id], True)
         if to_planet is None:
             return make_response(jsonify("Error"), 404)
-        from_planet = database_execute_fetchone("SELECT id from planet where id = %d", [from_planet_id])
+        from_planet = database_execute("SELECT id from planet where id = %d", [from_planet_id], True)
         if from_planet is None:
             return make_response(jsonify("Error"), 404)
 
         # into db
-        connection = database_execute_fetchone("INSERT INTO connection(id, price, from_planet_id, to_planet_id) VALUES (default, %d, %d, %d) RETURNING (id, price, from_planet_id, to_planet_id)", [price, from_planet_id, to_planet_id])
+        connection = database_execute("INSERT INTO connection(id, price, from_planet_id, to_planet_id) VALUES (default, %d, %d, %d) RETURNING (id, price, from_planet_id, to_planet_id)", [price, from_planet_id, to_planet_id], fetchOne=True)
 
         ret_val = dict()
         ret_val["id"] = connection[0]
@@ -127,7 +125,7 @@ def bookings(fromPlanet: int, toPlanet: int):
     if request.method != "GET":
         return make_response(jsonify("Error"), 422)
 
-    connection_list = database_execute_fetchall("SELECT price, from_planet_id, to_planet_id FROM connection", None)
+    connection_list = database_execute("SELECT price, from_planet_id, to_planet_id FROM connection", None, fetchOne=False)
 
     if connection_list is None:
         response = make_response(jsonify(list()), 200)
@@ -152,11 +150,7 @@ def bookings(fromPlanet: int, toPlanet: int):
     # todo: get corresponding conn
 
 
-
-
-
-
-def database_execute_fetchone(script: str, parameters: list or None):
+def database_execute(script: str, parameters: list or None, fetchOne: bool):
 
     hostname = "localhost"
     database = "ase"
@@ -178,46 +172,11 @@ def database_execute_fetchone(script: str, parameters: list or None):
             cur.execute(script)
         else:
             cur.execute(script, parameters)
-        ret_val = cur.fetchone()
 
-        if ret_val is None:
-            cur.close()
-            conn.close()
-            return None
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        return ret_val
-
-    except Exception as error:
-        print(error)
-        sys.exit(1)
-
-
-def database_execute_fetchall(script: str, parameters: list or None):
-
-    hostname = "localhost"
-    database = "ase"
-    username = "ase"
-    pwd = "ase"
-    port_id = 5432
-
-    try:
-        conn = psycopg2.connect(
-            host=hostname,
-            dbname=database,
-            user=username,
-            password=pwd,
-            port=port_id
-        )
-
-        cur = conn.cursor()
-        if parameters is None:
-            cur.execute(script)
+        if fetchOne:
+            ret_val = cur.fetchone()
         else:
-            cur.execute(script, parameters)
-        ret_val = cur.fetchall()
+            ret_val = cur.fetchall()
 
         if ret_val is None:
             cur.close()
