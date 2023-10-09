@@ -4,6 +4,7 @@ import psycopg2
 from flask import Flask, request, jsonify, make_response
 from dijkstar import Graph, find_path
 
+# for dfs, bfs: from leafy import Graph
 
 app = Flask(__name__)
 
